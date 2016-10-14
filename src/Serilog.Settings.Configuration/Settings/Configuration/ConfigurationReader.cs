@@ -4,7 +4,11 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
+
+#if DEPENDENCY_MODEL
 using Microsoft.Extensions.DependencyModel;
+#endif
+
 using Microsoft.Extensions.Primitives;
 
 using Serilog.Configuration;
@@ -17,14 +21,21 @@ namespace Serilog.Settings.Configuration
     class ConfigurationReader : ILoggerSettings
     {
         readonly IConfigurationSection _configuration;
+
+#if DEPENDENCY_MODEL
         readonly DependencyContext _dependencyContext;
 
         public ConfigurationReader(IConfigurationSection configuration, DependencyContext dependencyContext)
+            : this(configuration)
+        {
+            _dependencyContext = dependencyContext;
+        }
+#endif
+        public ConfigurationReader(IConfigurationSection configuration)
         {
             if (configuration == null) throw new ArgumentNullException(nameof(configuration));
 
             _configuration = configuration;
-            _dependencyContext = dependencyContext;
         }
 
         public void Configure(LoggerConfiguration loggerConfiguration)
@@ -141,11 +152,13 @@ namespace Serilog.Settings.Configuration
             var query = Enumerable.Empty<string>();
             var filter = new Func<string, bool>(name => name != null && name.ToLowerInvariant().Contains("serilog"));
 
+#if DEPENDENCY_MODEL
             if (_dependencyContext != null)
             {
                 query = from lib in _dependencyContext.RuntimeLibraries where filter(lib.Name) select lib.Name;
             }
             else
+#endif 
             {
 #if APPDOMAIN
                 query = from outputAssemblyPath in System.IO.Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory, "*.dll")
@@ -171,6 +184,14 @@ namespace Serilog.Settings.Configuration
                         return name.Value;
                     });
 
+            var environmentExpander = new Func<string, string>(
+#if ENVIRONMENT
+                val => Environment.ExpandEnvironmentVariables(val)
+#else
+                val => val
+#endif
+                );
+
             var children = directive.GetChildren();
 
             var result =
@@ -182,7 +203,7 @@ namespace Serilog.Settings.Configuration
                  where child.Value == null
                  let name = nameParser(child)
                  let callArgs = (from argument in child.GetSection("Args").GetChildren()
-                                 select new { Name = argument.Key, Value = Environment.ExpandEnvironmentVariables(argument.Value) }).ToDictionary(p => p.Name, p => p.Value)
+                                 select new { Name = argument.Key, Value = environmentExpander(argument.Value) }).ToDictionary(p => p.Name, p => p.Value)
                  select new { Name = name, Args = callArgs }))
                      .ToLookup(p => p.Name, p => p.Args);
 

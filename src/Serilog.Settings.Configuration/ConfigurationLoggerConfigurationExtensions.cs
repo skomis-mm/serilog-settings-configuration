@@ -14,7 +14,11 @@
 
 using System;
 using Microsoft.Extensions.Configuration;
+
+#if DEPENDENCY_MODEL
 using Microsoft.Extensions.DependencyModel;
+#endif
+
 using Serilog.Configuration;
 using Serilog.Settings.Configuration;
 
@@ -27,6 +31,7 @@ namespace Serilog
     {
         const string DefaultSectionName = "Serilog";
 
+#if DEPENDENCY_MODEL
         /// <summary>
         /// Reads logger settings from the provided configuration object using the default section name.
         /// </summary>
@@ -62,5 +67,31 @@ namespace Serilog
 
             return settingConfiguration.Settings(new ConfigurationReader(configuration, dependencyContext ?? DependencyContext.Default));
         }
+#else
+        /// <summary>
+        /// Reads logger settings from the provided configuration object using the default section name.
+        /// </summary>
+        /// <param name="settingConfiguration">Logger setting configuration.</param>
+        /// <param name="configuration">A configuration object with a Serilog section.</param>
+        /// <returns>An object allowing configuration to continue.</returns>
+        public static LoggerConfiguration Configuration(this LoggerSettingsConfiguration settingConfiguration, IConfiguration configuration)
+        {
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+            return settingConfiguration.ConfigurationSection(configuration.GetSection(DefaultSectionName));
+        }
+
+        /// <summary>
+        /// Reads logger settings from the provided configuration section.
+        /// </summary>
+        /// <param name="settingConfiguration">Logger setting configuration.</param>
+        /// <param name="configuration">The Serilog configuration section</param>
+        /// <returns>An object allowing configuration to continue.</returns>
+        public static LoggerConfiguration ConfigurationSection(this LoggerSettingsConfiguration settingConfiguration, IConfigurationSection configuration)
+        {
+            if (settingConfiguration == null) throw new ArgumentNullException(nameof(settingConfiguration));
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+            return settingConfiguration.Settings(new ConfigurationReader(configuration));
+        }
+#endif
     }
 }
