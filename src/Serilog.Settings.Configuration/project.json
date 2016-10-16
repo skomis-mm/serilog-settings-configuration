@@ -18,6 +18,11 @@
     "warningsAsErrors": true
   },
   "frameworks": {
+    "net4.5": {
+      "buildOptions": {
+        "define": [ "APPDOMAIN", "ENVIRONMENT" ]
+      }
+    },
     "net4.5.1": {
       "dependencies": {
         "Microsoft.Extensions.DependencyModel": "1.0.0"
